@@ -132,7 +132,7 @@ bot.command("vacancies", async (ctx) => {
 
 bot.on("message", (ctx) => {
   console.log("Chat ID:", ctx.chat.id);
-  ctx.reply(`Your Chat ID is: ${ctx.chat.id}`);
+  //ctx.reply(`Your Chat ID is: ${ctx.chat.id}`);
 });
 
 // Set an interval to check for updates every 10 minutes
