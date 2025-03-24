@@ -97,6 +97,24 @@ async function checkForUpdates(ctx) {
       await bot.telegram.sendMessage(process.env.CHAT_ID, message, {
         parse_mode: "Markdown",
       });
+
+      // Send the login button ONLY if an update was sent
+      await bot.telegram.sendMessage(
+        process.env.CHAT_ID,
+        "Login to Portal Now! 📟",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🔑 Login Now",
+                  url: "https://www.housemanship.mdcn.gov.ng/login",
+                },
+              ],
+            ],
+          },
+        }
+      );
     }
 
     // Update the previous vacancies list
