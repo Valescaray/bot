@@ -153,7 +153,10 @@ setInterval(() => {
 // Start the bot
 (async () => {
   try {
-    await bot.telegram.deleteWebhook();
+    // Clear any previous webhook or polling session
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+
+    // Start bot with polling
     await bot.launch();
     console.log("🤖 Bot is running with polling...");
   } catch (error) {
