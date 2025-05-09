@@ -151,5 +151,15 @@ setInterval(() => {
 }, 60000);
 
 // Start the bot
-bot.launch();
-console.log("🤖 Bot is running...");
+(async () => {
+  try {
+    await bot.telegram.deleteWebhook();
+    await bot.launch();
+    console.log("🤖 Bot is running with polling...");
+  } catch (error) {
+    console.error("Failed to launch bot:", error);
+  }
+})();
+
+//bot.launch();
+//console.log("🤖 Bot is running...");
