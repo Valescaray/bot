@@ -174,9 +174,9 @@ async function checkForUpdates() {
 }
 
 //Check vacancies every 1 minutes
-setInterval(() => {
-  checkForUpdates(bot.telegram);
-}, 60000); // 1 minute interval
+// setInterval(() => {
+//   checkForUpdates(bot.telegram);
+// }, 60000); // 1 minute interval
 
 //=== Launch Bot + Express Server ===
 (async () => {
@@ -198,10 +198,10 @@ setInterval(() => {
       console.log(`🚀 Server listening on port ${PORT}`);
     });
 
-    // Check vacancies every 1 minutes
-    // setInterval(() => {
-    //   checkForUpdates();
-    // }, 60000); // 1 mins
+    //Check vacancies every 1 minutes
+    setInterval(() => {
+      checkForUpdates();
+    }, 60000); // 1 mins
   } catch (err) {
     console.error("Failed to launch bot:", err);
   }
