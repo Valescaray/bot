@@ -150,7 +150,7 @@ setInterval(() => {
   checkForUpdates(bot.telegram);
 }, 60000);
 
-// Start the bot
+//Start the bot
 (async () => {
   try {
     // Clear any previous webhook or polling session
@@ -164,5 +164,5 @@ setInterval(() => {
   }
 })();
 
-//bot.launch();
-//console.log("🤖 Bot is running...");
+// bot.launch();
+// console.log("🤖 Bot is running...");
