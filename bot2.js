@@ -8,38 +8,64 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 let previousVacancies = [];
 
-// Delete any existing webhook first (if any)
-bot.telegram
-  .deleteWebhook()
-  .then(() => {
-    console.log("Previous webhook deleted.");
-  })
-  .catch((error) => {
-    console.error("Error deleting webhook:", error.message);
-  });
+//Delete any existing webhook first (if any)
+// bot.telegram
+//   .deleteWebhook()
+//   .then(() => {
+//     console.log("Previous webhook deleted.");
+//   })
+//   .catch((error) => {
+//     console.error("Error deleting webhook:", error.message);
+//   });
 
 // === Webhook Setup ===
-const WEBHOOK_PATH = `/bot${process.env.BOT_TOKEN}`;
+//const WEBHOOK_PATH = `/bot${process.env.BOT_TOKEN}`;
+//const WEBHOOK_URL = `${process.env.APP_URL}${WEBHOOK_PATH}`; // APP_URL must be set in .env
+
+const WEBHOOK_PATH = "/webhook";
 const WEBHOOK_URL = `${process.env.APP_URL}${WEBHOOK_PATH}`; // APP_URL must be set in .env
 
 // Manual command
+// bot.command("vacancies", async (ctx) => {
+//   ctx.reply("Fetching available housemanship vacancies...");
+//   const vacancies = await getVacancies();
+
+//   if (!vacancies.length) {
+//     ctx.reply("No available vacancies found.");
+//     return;
+//   }
+
+//   let message = "🏥 *Available Housemanship Vacancies:*\n\n";
+//   vacancies.forEach((vacancy, index) => {
+//     message += `${index + 1}. *${vacancy.centerName}*\n`;
+//   });
+
+//   ctx.replyWithMarkdown(message);
+
+//   previousVacancies = vacancies;
+// });
+
 bot.command("vacancies", async (ctx) => {
-  ctx.reply("Fetching available housemanship vacancies...");
-  const vacancies = await getVacancies();
+  try {
+    ctx.reply("Fetching available housemanship vacancies...");
+    const vacancies = await getVacancies();
 
-  if (!vacancies.length) {
-    ctx.reply("No available vacancies found.");
-    return;
+    if (!vacancies.length) {
+      ctx.reply("No available vacancies found.");
+      return;
+    }
+
+    let message = "🏥 *Available Housemanship Vacancies:*\n\n";
+    vacancies.forEach((vacancy, index) => {
+      message += `${index + 1}. *${vacancy.centerName}*\n`;
+    });
+
+    ctx.replyWithMarkdown(message);
+    previousVacancies = vacancies;
+  } catch (error) {
+    console.error("Error fetching vacancies:", error);
+    ctx.reply("❌ Error fetching vacancies.");
   }
-
-  let message = "🏥 *Available Housemanship Vacancies:*\n\n";
-  vacancies.forEach((vacancy, index) => {
-    message += `${index + 1}. *${vacancy.centerName}*\n`;
-  });
-
-  ctx.replyWithMarkdown(message);
-
-  previousVacancies = vacancies;
 });
 
 bot.on("message", (ctx) => {
@@ -147,13 +173,19 @@ async function checkForUpdates() {
   }
 }
 
-// === Launch Bot + Express Server ===
+//Check vacancies every 1 minutes
+setInterval(() => {
+  checkForUpdates(bot.telegram);
+}, 60000); // 1 minute interval
+
+//=== Launch Bot + Express Server ===
 (async () => {
   try {
     await bot.telegram.setWebhook(WEBHOOK_URL);
     console.log("✅ Webhook set to:", WEBHOOK_URL);
 
-    app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
+    //app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
+    app.use(bot.webhookCallback(WEBHOOK_PATH));
 
     // Root route for Railway
     app.get("/", (req, res) => {
@@ -167,10 +199,44 @@ async function checkForUpdates() {
     });
 
     // Check vacancies every 1 minutes
-    setInterval(() => {
-      checkForUpdates();
-    }, 60000); // 1 mins
+    // setInterval(() => {
+    //   checkForUpdates();
+    // }, 60000); // 1 mins
   } catch (err) {
     console.error("Failed to launch bot:", err);
   }
 })();
+
+// // Middleware for Telegram webhook
+// app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
+
+// // Check webhook status
+// app.get("/webhook-info", async (req, res) => {
+//   try {
+//     const info = await bot.telegram.getWebhookInfo();
+//     res.status(200).json(info);
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+// // Set webhook
+// (async () => {
+//   try {
+//     await bot.telegram.setWebhook(WEBHOOK_URL);
+//     console.log("✅ Webhook set to:", WEBHOOK_URL);
+//   } catch (error) {
+//     console.error("❌ Error setting webhook:", error);
+//   }
+// })();
+
+// // Start server
+// const PORT = process.env.PORT || 4000;
+// app.listen(PORT, () => {
+//   console.log(`🚀 Server listening on port ${PORT}`);
+// });
+
+// //Check vacancies every 1 minutes
+// setInterval(() => {
+//   checkForUpdates();
+// }, 60000); // 1 mins
