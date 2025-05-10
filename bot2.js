@@ -8,6 +8,16 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 let previousVacancies = [];
 
+// Delete any existing webhook first (if any)
+bot.telegram
+  .deleteWebhook()
+  .then(() => {
+    console.log("Previous webhook deleted.");
+  })
+  .catch((error) => {
+    console.error("Error deleting webhook:", error.message);
+  });
+
 // === Webhook Setup ===
 const WEBHOOK_PATH = `/bot${process.env.BOT_TOKEN}`;
 const WEBHOOK_URL = `${process.env.APP_URL}${WEBHOOK_PATH}`; // APP_URL must be set in .env
