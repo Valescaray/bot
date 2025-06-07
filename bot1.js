@@ -135,6 +135,7 @@ bot.command("vacancies", async (ctx) => {
   });
 
   ctx.replyWithMarkdown(message);
+  console.log("Message sent by bot:", ctx.message.text);
 
   // Update the stored vacancies after manual fetch
   previousVacancies = vacancies;
