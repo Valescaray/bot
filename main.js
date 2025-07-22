@@ -201,7 +201,7 @@ async function checkForUpdates() {
     //Check vacancies every 1 minutes
     setInterval(() => {
       checkForUpdates();
-    }, 60000); // 1 mins
+    }, 47000); // 1 mins
   } catch (err) {
     console.error("Failed to launch bot:", err);
   }
