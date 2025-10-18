@@ -15,7 +15,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 let previousVacancies = [];
 let lastUpdateTime = Date.now();
-let intervalTime = 47000; // Default interval (47 seconds)
+let intervalTime = 40000; // Default interval (47 seconds)
 let checkInterval;
 let updatesToday = 0;
 
@@ -133,7 +133,7 @@ function handleUpdateDetected() {
   updatesToday++;
 
   if (updatesToday === 1 && intervalTime !== 40000) {
-    intervalTime = 40000; // First update → 40s
+    intervalTime = 35000; // First update → 40s
     startInterval(intervalTime);
     console.log("⏱ Changed interval to 40s (first update)");
   } else if (updatesToday === 2 && intervalTime !== 30000) {
