@@ -17,7 +17,10 @@ let previousVacancies = [];
 let lastUpdateTime = Date.now();
 let intervalTime = 40000; // Default interval (47 seconds)
 let checkInterval;
-let updatesToday = 0;
+let  updatesToday  = 0;
+
+let notificationQueue = [];
+let isProcessing = false;
 
 const WEBHOOK_PATH = "/webhook";
 const WEBHOOK_URL = `${process.env.APP_URL}${WEBHOOK_PATH}`; // APP_URL must be set in .env
@@ -43,6 +46,70 @@ bot.command("vacancies", async (ctx) => {
     console.error("Error fetching vacancies:", error);
     ctx.reply("❌ Error fetching vacancies.");
   }
+});
+
+bot.command("testperformance", async (ctx) => {
+  if (ctx.from.id.toString() !== process.env.ADMIN_USER_ID) {
+    return ctx.reply("⛔ Admin only");
+  }
+
+  try {
+    ctx.reply("🧪 Testing query performance...");
+
+    const testHospitals = [
+      "Federal Medical Centre Asaba",
+      "Lagos University Teaching Hospital"
+    ];
+
+    // ❌ OLD METHOD: Fetch all users
+    const start1 = Date.now();
+    const { data: allUsers } = await supabase
+      .from("subscriptions")
+      .select("user_id, hospitals, phone_number");
+    const time1 = Date.now() - start1;
+
+    // Filter in JavaScript
+    const matchedOld = allUsers?.filter(user => 
+      user.hospitals?.some(h => testHospitals.includes(h))
+    ) || [];
+
+    // ✅ NEW METHOD: Database-filtered query
+    const start2 = Date.now();
+    const { data: filteredUsers } = await supabase
+      .from("subscriptions")
+      .select("user_id, hospitals, phone_number")
+      .overlaps("hospitals", testHospitals);
+    const time2 = Date.now() - start2;
+
+    const improvement = Math.round(((time1 - time2) / time1) * 100);
+
+    ctx.reply(`📊 Performance Test Results:
+
+❌ Old Method (Fetch All):
+   • Query time: ${time1}ms
+   • Records fetched: ${allUsers?.length || 0}
+   • Matched users: ${matchedOld.length}
+
+✅ New Method (DB Filter):
+   • Query time: ${time2}ms
+   • Records fetched: ${filteredUsers?.length || 0}
+   • Matched users: ${filteredUsers?.length || 0}
+
+🚀 Performance: ${improvement}% faster!
+💾 Data saved: ${((1 - (filteredUsers?.length || 0) / (allUsers?.length || 1)) * 100).toFixed(1)}% less data transferred`);
+
+  } catch (error) {
+    ctx.reply(`❌ Test failed: ${error.message}`);
+  }
+});
+
+bot.command("queuestatus", async (ctx) => {
+  ctx.reply(`📊 Queue Status:
+
+- Pending notifications: ${notificationQueue.length}
+- Currently processing: ${isProcessing ? "Yes" : "No"}
+- Batch size: 10 users per batch
+- Processing interval: Every 3 seconds`);
 });
 
 bot.command("start", async (ctx) => {
@@ -81,7 +148,7 @@ bot.command("start", async (ctx) => {
 
     replyText +=
       `📝 Hope you’ve clicked on the link to join the Telegram updates group chat for all hospitals.\n\n` +
-      `<b>💳 Payment Channel:</b> <a href="https://t.me/Estify_bot">Click here to return</a>\n\n` +
+      `<b>💳 Payment Channel:</b> <a href="https://t.me/RiosReadyBot">Click here to return</a>\n\n` +
       `<b>💬 For complaints?</b> <a href="https://t.me/timewise_agent">Chat with our customer service agent!</a>`;
 
     await ctx.reply(replyText, { parse_mode: "HTML" });
@@ -166,7 +233,6 @@ async function checkForUpdates() {
     if (addedHospitals.length) {
       const count = addedHospitals.length;
       const text = count === 1 ? "hospital" : "hospitals";
-
       message += `*🏥 Housemanship Portal Updated!*\n\n`;
       message += `🆕 *${count} new ${text} added:*\n`;
       addedHospitals.forEach((h) => {
@@ -178,7 +244,6 @@ async function checkForUpdates() {
     if (removedHospitals.length) {
       const count = removedHospitals.length;
       const text = count === 1 ? "hospital" : "hospitals";
-
       message += `*🏥 Housemanship Portal Updated!*\n\n`;
       message += `❌ *${count} ${text} removed:*\n`;
       removedHospitals.forEach((h) => {
@@ -195,11 +260,8 @@ async function checkForUpdates() {
           vacancy.officer_left
         } ${slotText})*\n`;
       });
-    } else {
-      return;
-    }
 
-    if (message) {
+      // ✅ INSTANT GROUP BROADCAST - Priority #1
       await bot.telegram.sendMessage(process.env.CHAT_ID, message, {
         parse_mode: "Markdown",
         reply_markup: {
@@ -215,96 +277,130 @@ async function checkForUpdates() {
       });
 
       handleUpdateDetected();
+
+      // ✅ QUEUE PERSONAL NOTIFICATIONS (non-blocking)
+      queuePersonalNotifications(addedHospitals, removedHospitals);
     }
 
-    // ✅ Fetch all subscribed users
+    previousVacancies = newVacancies;
+  } catch (error) {
+    console.error("Error checking for updates:", error);
+  }
+}
+
+// ✅ OPTIMIZED: Only fetch users watching specific hospitals
+async function queuePersonalNotifications(addedHospitals, removedHospitals) {
+  if (addedHospitals.length === 0) return;
+
+  try {
+    const hospitalNames = addedHospitals.map(h => h.centerName);
+    
+    console.log(`🔍 Searching for users watching: ${hospitalNames.join(", ")}`);
+
+    // ✅ Database-level filtering - only fetch matching users
     const { data: users, error } = await supabase
       .from("subscriptions")
-      .select("phone_number, hospitals, plan, user_id");
-    console.log("Subscribed users:", users);
+      .select("phone_number, hospitals, plan, user_id")
+      .overlaps("hospitals", hospitalNames);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Database query error:", error);
+      return;
+    }
 
-    // ✅ Notify users based on preferences
+    if (!users || users.length === 0) {
+      console.log("📭 No users watching these hospitals");
+      return;
+    }
+
+    console.log(`🎯 Found ${users.length} users (filtered by database)`);
+
+    // Build notification tasks
+    const tasks = [];
+    
     for (const user of users) {
-      if (!user.hospitals) continue;
+      if (!user.hospitals || !Array.isArray(user.hospitals)) continue;
 
-      const userHospitals = Array.isArray(user.hospitals)
-        ? user.hospitals
-        : user.hospitals.split(",").map((h) => h.trim());
-      console.log(
-        `User ${user.phone_number} subscribed hospitals:`,
-        userHospitals
-      );
-
-      const matchedHospitals = addedHospitals.filter((h) =>
-        userHospitals.includes(h.centerName)
-      );
-      console.log(`User ${user.phone_number} watching:`, userHospitals);
-      console.log(
-        `Matched hospitals for user ${user.phone_number}:`,
-        matchedHospitals
+      const matchedHospitals = addedHospitals.filter(h =>
+        user.hospitals.includes(h.centerName)
       );
 
       if (matchedHospitals.length > 0) {
-        const template = `🏥 *Hospital(s) you're watching just opened housemanship slots!*
-
-         <%hospitallist%>
-
-      login to apply: https://www.housemanship.mdcn.gov.ng/login`;
-
         const hospitalList = matchedHospitals
           .map((h, i) => `${i + 1}. ${h.centerName}`)
           .join(". ");
 
-        // Personalize message
-        const personalMessage = `*🏥 New housemanship slots available!*
-
-${hospitalList}
-
-👉 [Apply now](https://www.housemanship.mdcn.gov.ng/login)`;
-
-        console.log(hospitalList); // or send via Termii API
-
-        if (user.plan === "telegram") {
-          if (!user.user_id) {
-            console.log(`No Telegram user_id for user: ${user.phone_number}`);
-            continue;
-          }
-          await sendTelegramMessage(user.user_id, personalMessage, bot);
-        } else if (user.plan === "whatsapp") {
-          if (!user.phone_number) {
-            console.log(`No phone number for WhatsApp plan: ${user.user_id}`);
-            continue;
-          }
-          await sendWhatsAppMessage(user.phone_number, hospitalList);
-        } else if (user.plan === "bonus") {
-          if (user.phone_number) {
-            await sendWhatsAppMessage(user.phone_number, hospitalList);
-          } else {
-            console.log(`No phone number for bonus plan: ${user.user_id}`);
-          }
-          if (user.user_id) {
-            await sendTelegramMessage(user.user_id, personalMessage, bot);
-          } else {
-            console.log(
-              `No Telegram user_id for bonus plan: ${user.phone_number}`
-            );
-          }
-        } else {
-          console.log(
-            `Unknown plan: ${user.plan} for user: ${
-              user.phone_number || user.user_id
-            }`
-          );
-        }
+        tasks.push({
+          user,
+          hospitalList,
+          matchedHospitals,
+          timestamp: Date.now()
+        });
       }
     }
 
-    previousVacancies = newVacancies;
-    // lastUpdateTime = Date.now();
+    notificationQueue.push(...tasks);
+    console.log(`📬 Queued ${tasks.length} personal notifications`);
+
   } catch (error) {
-    console.error("Error checking for updates:", error);
+    console.error("Error queuing notifications:", error);
+  }
+}
+
+// ✅ BACKGROUND WORKER: Process notification queue
+async function processNotificationQueue() {
+  if (isProcessing || notificationQueue.length === 0) return;
+
+  isProcessing = true;
+  const BATCH_SIZE = 10;
+
+  try {
+    while (notificationQueue.length > 0) {
+      const batch = notificationQueue.splice(0, BATCH_SIZE);
+      
+      console.log(`📤 Processing batch of ${batch.length} notifications...`);
+
+      await Promise.allSettled(
+        batch.map(async (task) => {
+          const { user, hospitalList } = task;
+
+          const personalMessage = `*🏥 New housemanship slots available!*\n\n${hospitalList}\n\n👉 [Apply now](https://www.housemanship.mdcn.gov.ng/login)`;
+
+          try {
+            if (user.plan === "telegram" && user.user_id) {
+              await sendTelegramMessage(user.user_id, personalMessage, bot);
+            } else if (user.plan === "whatsapp" && user.phone_number) {
+              await sendWhatsAppMessage(user.phone_number, hospitalList);
+            } else if (user.plan === "bonus") {
+              const promises = [];
+              if (user.phone_number) {
+                promises.push(sendWhatsAppMessage(user.phone_number, hospitalList));
+              }
+              if (user.user_id) {
+                promises.push(sendTelegramMessage(user.user_id, personalMessage, bot));
+              }
+              await Promise.allSettled(promises);
+            }
+          } catch (err) {
+            console.error(
+              `❌ Failed to notify ${user.user_id || user.phone_number}:`,
+              err.message
+            );
+          }
+        })
+      );
+
+      // Rate limiting between batches
+      if (notificationQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    console.log("✅ Notification queue processed");
+  } catch (error) {
+    console.error("Error processing notification queue:", error);
+  } finally {
+    isProcessing = false;
   }
 }
 
@@ -422,6 +518,19 @@ async function notifyIfNoUpdateIn24Hrs() {
     setInterval(notifyIfNoUpdateIn24Hrs, 60 * 60 * 1000);
     startInterval(intervalTime);
     // setInterval(checkForUpdates); // 47 seconds
+
+    // ✅ START QUEUE PROCESSOR
+    setInterval(processNotificationQueue, 3000); // Process queue every 3 seconds
+
+    // ✅ MONITOR QUEUE HEALTH
+    setInterval(() => {
+      if (notificationQueue.length > 0) {
+        console.log(`📊 Queue status: ${notificationQueue.length} pending notifications`);
+      }
+      if (notificationQueue.length > 500) {
+        console.warn(`⚠️ Large queue backlog: ${notificationQueue.length} notifications!`);
+      }
+    }, 30000); // Check every 30 seconds
   } catch (err) {
     console.error("Failed to launch bot:", err);
   }
