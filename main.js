@@ -557,7 +557,7 @@ async function getVacancies() {
       try {
         token = await tokenManager.getToken();
         tokenSource = 'TokenManager (Automatic Authentication)';
-        console.log('✅ Using token from TokenManager');
+        // console.log('✅ Using token from TokenManager');
       } catch (error) {
         console.error('⚠️ TokenManager failed:', error.message);
         console.log('Attempting fallback to manual JWT_TOKEN...');
@@ -602,7 +602,7 @@ async function getVacancies() {
     }
 
     // Make API request
-    console.log(`Making API request using ${tokenSource}...`);
+    // console.log(`Making API request using ${tokenSource}...`);
     const response = await axios.post(
       process.env.API_URL || 'https://api.housemanship.mdcn.gov.ng/api/availablevacancies.php',
       { jwt: token, tid: 1 },
@@ -614,8 +614,8 @@ async function getVacancies() {
       }
     );
 
-    console.log(`✅ Request successful using ${tokenSource}`);
-    console.log(`✅ Retrieved ${response.data?.length || 0} vacancies`);
+    // console.log(`✅ Request successful using ${tokenSource}`);
+    // console.log(`✅ Retrieved ${response.data?.length || 0} vacancies`);
     return response.data;
 
   } catch (error) {
