@@ -13,6 +13,15 @@ const app = express();
 app.use(express.json());
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+// DEBUG: Log all incoming updates
+// bot.use(async (ctx, next) => {
+//   console.log('📨 Update received:', ctx.updateType);
+//   if (ctx.message && ctx.message.text) {
+//     console.log('📝 Text:', ctx.message.text);
+//   }
+//   await next();
+// });
+
 let previousVacancies = [];
 let lastUpdateTime = Date.now();
 let intervalTime = 40000; // Default interval (47 seconds)
@@ -56,6 +65,8 @@ class TokenManager {
       await this.sendTokenStatus(ctx);
     });
 
+    
+
     // Command: /test
     this.bot.command('test', async (ctx) => {
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
@@ -74,23 +85,35 @@ class TokenManager {
       await this.sendHelpMessage(ctx);
     });
 
+
+    this.bot.hears(/^\d{6}$/, async (ctx) => {
+    if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+    
+    if (this.otpPromiseResolve) {
+      console.log('✅ OTP received from Telegram:', ctx.message.text);
+      await ctx.reply('✅ OTP received! Verifying...');
+      this.otpPromiseResolve(ctx.message.text);
+      this.otpPromiseResolve = null;
+    }
+  });
+
     // Listen for OTP (6-digit numbers)
-    this.bot.on('text', async (ctx) => {
-      if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+    // this.bot.on('text', async (ctx) => {
+    //   if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return next();
       
-      const text = ctx.message.text;
+    //   const text = ctx.message.text;
       
-      // Ignore commands
-      if (text.startsWith('/')) return;
+    //   // Ignore commands
+    //   if (text.startsWith('/')) return next();
       
-      // Check if it's a 6-digit OTP
-      if (/^\d{6}$/.test(text) && this.otpPromiseResolve) {
-        console.log('✅ OTP received from Telegram:', text);
-        await ctx.reply('✅ OTP received! Verifying...');
-        this.otpPromiseResolve(text);
-        this.otpPromiseResolve = null;
-      }
-    });
+    //   // Check if it's a 6-digit OTP
+    //   if (/^\d{6}$/.test(text) && this.otpPromiseResolve) {
+    //     console.log('✅ OTP received from Telegram:', text);
+    //     await ctx.reply('✅ OTP received! Verifying...');
+    //     this.otpPromiseResolve(text);
+    //     this.otpPromiseResolve = null;
+    //   }
+    // });
 
     console.log('✅ Telegram bot commands registered');
   }
@@ -409,6 +432,7 @@ Please reply with the 6-digit OTP code.
 const tokenManager = new TokenManager(bot);
 
 bot.command("vacancies", async (ctx) => {
+  console.log('✅ /vacancies command triggered');
   try {
     ctx.reply("Fetching available housemanship vacancies...");
     const vacancies = await getVacancies();
@@ -432,6 +456,7 @@ bot.command("vacancies", async (ctx) => {
 });
 
 bot.command("testperformance", async (ctx) => {
+    console.log('✅ /testperformance command triggered');
   if (ctx.from.id.toString() !== process.env.TELEGRAM_CHAT_ID) {
     return ctx.reply("⛔ Admin only");
   }
@@ -447,7 +472,7 @@ bot.command("testperformance", async (ctx) => {
     // ❌ OLD METHOD: Fetch all users
     const start1 = Date.now();
     const { data: allUsers } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("user_id, hospitals, phone_number");
     const time1 = Date.now() - start1;
 
@@ -459,7 +484,7 @@ bot.command("testperformance", async (ctx) => {
     // ✅ NEW METHOD: Database-filtered query
     const start2 = Date.now();
     const { data: filteredUsers } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("user_id, hospitals, phone_number")
       .overlaps("hospitals", testHospitals);
     const time2 = Date.now() - start2;
@@ -502,7 +527,7 @@ bot.command("start", async (ctx) => {
   try {
     // Fetch ALL subscriptions for this user
     const { data: subscriptions, error } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("hospitals, plan, plan_id, phone_number")
       .eq("user_id", userId);
 
@@ -541,10 +566,24 @@ bot.command("start", async (ctx) => {
   }
 });
 
-bot.on("message", (ctx) => {
-  console.log("Chat ID:", ctx.chat.id);
-  // ctx.reply(`Your Chat ID is: ${ctx.chat.id}`);
+// Catch-all message handler (must be AFTER all command handlers)
+// Only log non-command messages to avoid interference
+
+  // Ignore if it's a command (starts with /)
+//   bot.on("message", async (ctx, next) => {
+//   if (!ctx.message?.text?.startsWith('/')) {
+//     console.log("Chat ID:", ctx.chat.id);
+//   }
+//   await next(); // 🔑 THIS IS REQUIRED
+// });
+
+bot.hears(/^[^/].*/, (ctx) => {
+  // Only matches non-command messages (doesn't start with /)
+  console.log("Non-command message from Chat ID:", ctx.chat.id);
 });
+
+
+
 
 // === Vacancy Fetching Function ===
 async function getVacancies() {
@@ -754,7 +793,7 @@ async function queuePersonalNotifications(addedHospitals, removedHospitals) {
 
     // ✅ Database-level filtering - only fetch matching users
     const { data: users, error } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("phone_number, hospitals, plan, user_id")
       .overlaps("hospitals", hospitalNames);
 
@@ -948,6 +987,7 @@ async function notifyIfNoUpdateIn24Hrs() {
 
     //app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
     app.use(bot.webhookCallback(WEBHOOK_PATH));
+    
 
     // Root route for Railway
     app.get("/", (req, res) => {
