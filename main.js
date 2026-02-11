@@ -6,7 +6,7 @@ const { createClient } = require("@supabase/supabase-js");
 const { message } = require("telegraf/filters");
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_KEY,
 );
 
 const app = express();
@@ -26,7 +26,7 @@ let previousVacancies = [];
 let lastUpdateTime = Date.now();
 let intervalTime = 40000; // Default interval (47 seconds)
 let checkInterval;
-let  updatesToday  = 0;
+let updatesToday = 0;
 
 let notificationQueue = [];
 let isProcessing = false;
@@ -48,11 +48,11 @@ class TokenManager {
   constructor(bot) {
     this.token = null;
     this.expiry = null;
-    this.loginUrl = 'https://api.housemanship.mdcn.gov.ng/api/login.php';
-    this.otpUrl = 'https://api.housemanship.mdcn.gov.ng/api/verify_otp.php';
+    this.loginUrl = "https://api.housemanship.mdcn.gov.ng/api/login.php";
+    this.otpUrl = "https://api.housemanship.mdcn.gov.ng/api/verify_otp.php";
     this.bot = bot;
     this.otpPromiseResolve = null;
-    
+
     if (this.bot) {
       this.setupTelegramListeners();
     }
@@ -60,52 +60,49 @@ class TokenManager {
 
   setupTelegramListeners() {
     // Command: /status
-    this.bot.command('status', async (ctx) => {
+    this.bot.command("status", async (ctx) => {
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
       await this.sendTokenStatus(ctx);
     });
 
-    
-
     // Command: /test
-    this.bot.command('test', async (ctx) => {
+    this.bot.command("test", async (ctx) => {
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
       await this.runTest(ctx);
     });
 
     // Command: /refresh
-    this.bot.command('refresh', async (ctx) => {
+    this.bot.command("refresh", async (ctx) => {
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
       await this.forceRefreshToken(ctx);
     });
 
     // Command: /help
-    this.bot.command('help', async (ctx) => {
+    this.bot.command("help", async (ctx) => {
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
       await this.sendHelpMessage(ctx);
     });
 
-
     this.bot.hears(/^\d{6}$/, async (ctx) => {
-    if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
-    
-    if (this.otpPromiseResolve) {
-      console.log('✅ OTP received from Telegram:', ctx.message.text);
-      await ctx.reply('✅ OTP received! Verifying...');
-      this.otpPromiseResolve(ctx.message.text);
-      this.otpPromiseResolve = null;
-    }
-  });
+      if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+
+      if (this.otpPromiseResolve) {
+        console.log("✅ OTP received from Telegram:", ctx.message.text);
+        await ctx.reply("✅ OTP received! Verifying...");
+        this.otpPromiseResolve(ctx.message.text);
+        this.otpPromiseResolve = null;
+      }
+    });
 
     // Listen for OTP (6-digit numbers)
     // this.bot.on('text', async (ctx) => {
     //   if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return next();
-      
+
     //   const text = ctx.message.text;
-      
+
     //   // Ignore commands
     //   if (text.startsWith('/')) return next();
-      
+
     //   // Check if it's a 6-digit OTP
     //   if (/^\d{6}$/.test(text) && this.otpPromiseResolve) {
     //     console.log('✅ OTP received from Telegram:', text);
@@ -115,7 +112,7 @@ class TokenManager {
     //   }
     // });
 
-    console.log('✅ Telegram bot commands registered');
+    console.log("✅ Telegram bot commands registered");
   }
 
   async sendHelpMessage(ctx) {
@@ -152,11 +149,11 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
   }
 
   async sendTokenStatus(ctx) {
-    let message = '🔍 *Token Status Check*\n\n';
+    let message = "🔍 *Token Status Check*\n\n";
 
     // Check TokenManager
     if (credentials.email && credentials.password) {
-      message += '✅ *Automatic Authentication*\n';
+      message += "✅ *Automatic Authentication*\n";
       message += `   📧 Email: ${credentials.email}\n`;
 
       if (this.token && this.expiry) {
@@ -170,26 +167,27 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
           message += `   ❌ Token expired ${Math.abs(Math.floor(expiresIn))} minutes ago\n`;
         }
       } else {
-        message += '   ℹ️ No cached token (will authenticate on next request)\n';
+        message +=
+          "   ℹ️ No cached token (will authenticate on next request)\n";
       }
 
       if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-        message += '   ✅ Telegram OTP configured\n';
+        message += "   ✅ Telegram OTP configured\n";
       } else {
-        message += '   ⚠️ Telegram OTP NOT configured\n';
+        message += "   ⚠️ Telegram OTP NOT configured\n";
       }
     } else {
-      message += '⚠️ *Automatic Authentication*: NOT configured\n';
+      message += "⚠️ *Automatic Authentication*: NOT configured\n";
     }
 
-    message += '\n';
+    message += "\n";
 
     // Check manual token
     if (process.env.JWT_TOKEN) {
-      message += '✅ *Manual JWT_TOKEN*: Found\n';
+      message += "✅ *Manual JWT_TOKEN*: Found\n";
       try {
         const payload = JSON.parse(
-          Buffer.from(process.env.JWT_TOKEN.split('.')[1], 'base64')
+          Buffer.from(process.env.JWT_TOKEN.split(".")[1], "base64"),
         );
         const expiresIn = (payload.exp * 1000 - Date.now()) / 1000 / 60;
 
@@ -201,33 +199,33 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
           message += `   ❌ Expired ${Math.abs(Math.floor(expiresIn))} minutes ago\n`;
         }
       } catch (e) {
-        message += '   ⚠️ Could not parse token\n';
+        message += "   ⚠️ Could not parse token\n";
       }
     } else {
-      message += '⚠️ *Manual JWT_TOKEN*: NOT found\n';
+      message += "⚠️ *Manual JWT_TOKEN*: NOT found\n";
     }
 
     await ctx.replyWithMarkdown(message);
   }
 
   async runTest(ctx) {
-    await ctx.reply('🧪 Running API test...');
+    await ctx.reply("🧪 Running API test...");
 
     try {
       const startTime = Date.now();
       const vacancies = await getVacancies();
       const duration = Date.now() - startTime;
 
-      let message = '✅ *Test Successful!*\n\n';
+      let message = "✅ *Test Successful!*\n\n";
       message += `⏱️ Response time: ${duration}ms\n`;
       message += `📊 Vacancies found: ${vacancies?.length || 0}\n`;
 
       if (vacancies && vacancies.length > 0) {
-        message += '\n📋 *Sample Vacancy:*\n';
+        message += "\n📋 *Sample Vacancy:*\n";
         const sample = vacancies[0];
-        message += `• Hospital: ${sample.centerName || 'N/A'}\n`;
-        message += `• Slots: ${sample.officer_left || 'N/A'}\n`;
-        
+        message += `• Hospital: ${sample.centerName || "N/A"}\n`;
+        message += `• Slots: ${sample.officer_left || "N/A"}\n`;
+
         if (vacancies.length > 1) {
           message += `\n_...and ${vacancies.length - 1} more_`;
         }
@@ -235,19 +233,19 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
 
       await ctx.replyWithMarkdown(message);
     } catch (error) {
-      let errorMessage = '❌ *Test Failed*\n\n';
+      let errorMessage = "❌ *Test Failed*\n\n";
       errorMessage += `Error: ${error.message}\n\n`;
-      errorMessage += '💡 *Suggestions:*\n';
-      errorMessage += '• Check /status for token validity\n';
-      errorMessage += '• Try /refresh to get a new token\n';
-      errorMessage += '• Ensure credentials are correct\n';
+      errorMessage += "💡 *Suggestions:*\n";
+      errorMessage += "• Check /status for token validity\n";
+      errorMessage += "• Try /refresh to get a new token\n";
+      errorMessage += "• Ensure credentials are correct\n";
 
       await ctx.replyWithMarkdown(errorMessage);
     }
   }
 
   async forceRefreshToken(ctx) {
-    await ctx.reply('🔄 Forcing token refresh...');
+    await ctx.reply("🔄 Forcing token refresh...");
 
     try {
       // Clear existing token
@@ -257,18 +255,18 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
       // Request new token
       await this.refreshToken();
 
-      let message = '✅ *Token Refreshed Successfully!*\n\n';
+      let message = "✅ *Token Refreshed Successfully!*\n\n";
       const expiresIn = (this.expiry - Date.now()) / 1000 / 60;
       const hours = Math.floor(expiresIn / 60);
       const minutes = Math.floor(expiresIn % 60);
-      
+
       message += `⏰ New token valid for: ${hours}h ${minutes}m\n`;
       message += `📅 Expires: ${new Date(this.expiry).toLocaleString()}\n`;
 
       await ctx.replyWithMarkdown(message);
     } catch (error) {
       await ctx.replyWithMarkdown(
-        `❌ *Refresh Failed*\n\nError: ${error.message}`
+        `❌ *Refresh Failed*\n\nError: ${error.message}`,
       );
     }
   }
@@ -280,7 +278,7 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
     }
 
     // Token expired or about to expire, get new one
-    console.log('Refreshing token...');
+    console.log("Refreshing token...");
     await this.refreshToken();
     return this.token;
   }
@@ -297,9 +295,10 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
   }
 
   // Send OTP request to Telegram and wait for response
-  async getOTPFromTelegram(message, timeoutMs = 300000) { // 5 minute timeout
+  async getOTPFromTelegram(message, timeoutMs = 300000) {
+    // 5 minute timeout
     if (!this.bot || !TELEGRAM_CHAT_ID) {
-      throw new Error('Telegram bot not configured');
+      throw new Error("Telegram bot not configured");
     }
 
     return new Promise((resolve, reject) => {
@@ -315,12 +314,15 @@ Please reply with the 6-digit OTP code.
 ⏱️ You have 5 minutes to respond.
       `;
 
-      this.bot.telegram.sendMessage(TELEGRAM_CHAT_ID, requestMessage, { parse_mode: 'Markdown' })
+      this.bot.telegram
+        .sendMessage(TELEGRAM_CHAT_ID, requestMessage, {
+          parse_mode: "Markdown",
+        })
         .then(() => {
-          console.log('📱 OTP request sent to Telegram');
+          console.log("📱 OTP request sent to Telegram");
         })
         .catch((error) => {
-          console.error('Failed to send Telegram message:', error.message);
+          console.error("Failed to send Telegram message:", error.message);
           reject(error);
         });
 
@@ -328,8 +330,11 @@ Please reply with the 6-digit OTP code.
       setTimeout(() => {
         if (this.otpPromiseResolve) {
           this.otpPromiseResolve = null;
-          this.bot.telegram.sendMessage(TELEGRAM_CHAT_ID, '⏱️ OTP request timed out. Please try again.');
-          reject(new Error('OTP request timed out'));
+          this.bot.telegram.sendMessage(
+            TELEGRAM_CHAT_ID,
+            "⏱️ OTP request timed out. Please try again.",
+          );
+          reject(new Error("OTP request timed out"));
         }
       }, timeoutMs);
     });
@@ -338,14 +343,14 @@ Please reply with the 6-digit OTP code.
   async refreshToken() {
     try {
       // Step 1: Initial login request
-      console.log('Sending login request...');
+      console.log("Sending login request...");
       const loginResponse = await axios.post(this.loginUrl, credentials);
 
       // Step 2: Check if OTP is required
-      if (loginResponse.data.status === 'OTP_REQUIRED') {
-        console.log('OTP Required!');
-        console.log('Email:', loginResponse.data.email);
-        console.log('Message:', loginResponse.data.message);
+      if (loginResponse.data.status === "OTP_REQUIRED") {
+        console.log("OTP Required!");
+        console.log("Email:", loginResponse.data.email);
+        console.log("Message:", loginResponse.data.message);
 
         let otpCode = null;
 
@@ -354,26 +359,31 @@ Please reply with the 6-digit OTP code.
           otpCode = this.extractOTPFromMessage(loginResponse.data.message);
 
           if (otpCode) {
-            console.log('✅ OTP extracted automatically:', otpCode);
+            console.log("✅ OTP extracted automatically:", otpCode);
           } else {
-            console.log('⚠️ Could not extract OTP from message');
+            console.log("⚠️ Could not extract OTP from message");
           }
         }
 
         // Step 4: Fallback to Telegram if extraction failed
         if (!otpCode) {
-          console.log('📱 Requesting OTP via Telegram...');
+          console.log("📱 Requesting OTP via Telegram...");
 
           try {
             otpCode = await this.getOTPFromTelegram(loginResponse.data.message);
           } catch (telegramError) {
-            console.error('Telegram OTP request failed:', telegramError.message);
-            throw new Error('Could not get OTP: automatic extraction failed and Telegram request timed out');
+            console.error(
+              "Telegram OTP request failed:",
+              telegramError.message,
+            );
+            throw new Error(
+              "Could not get OTP: automatic extraction failed and Telegram request timed out",
+            );
           }
         }
 
         // Step 5: Verify OTP
-        console.log('Verifying OTP...');
+        console.log("Verifying OTP...");
         const otpResponse = await axios.post(this.otpUrl, {
           email: credentials.email,
           otp_code: otpCode,
@@ -381,47 +391,51 @@ Please reply with the 6-digit OTP code.
 
         if (otpResponse.data.jwt) {
           this.token = otpResponse.data.jwt;
-          console.log('✅ Login successful with OTP!');
+          console.log("✅ Login successful with OTP!");
 
           // Send success message to Telegram
           if (this.bot && TELEGRAM_CHAT_ID) {
             await this.bot.telegram.sendMessage(
               TELEGRAM_CHAT_ID,
-              '✅ Successfully authenticated! Token will be valid for ~21 hours.'
+              "✅ Successfully authenticated! Token will be valid for ~21 hours.",
             );
           }
         } else {
-          throw new Error('OTP verification failed: ' + JSON.stringify(otpResponse.data));
+          throw new Error(
+            "OTP verification failed: " + JSON.stringify(otpResponse.data),
+          );
         }
       } else if (loginResponse.data.jwt) {
         // No OTP required, got token directly
         this.token = loginResponse.data.jwt;
-        console.log('✅ Login successful without OTP!');
+        console.log("✅ Login successful without OTP!");
       } else {
-        throw new Error('Unexpected login response: ' + JSON.stringify(loginResponse.data));
+        throw new Error(
+          "Unexpected login response: " + JSON.stringify(loginResponse.data),
+        );
       }
 
       // Parse expiry from token
       const payload = JSON.parse(
-        Buffer.from(this.token.split('.')[1], 'base64')
+        Buffer.from(this.token.split(".")[1], "base64"),
       );
       this.expiry = payload.exp * 1000;
 
-      console.log('Token expires:', new Date(this.expiry));
+      console.log("Token expires:", new Date(this.expiry));
     } catch (error) {
-      console.error('Failed to refresh token:', error.message);
+      console.error("Failed to refresh token:", error.message);
 
       // Notify user via Telegram
       if (this.bot && TELEGRAM_CHAT_ID) {
         await this.bot.telegram.sendMessage(
           TELEGRAM_CHAT_ID,
-          `❌ Authentication failed: ${error.message}`
+          `❌ Authentication failed: ${error.message}`,
         );
       }
 
       if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
       }
       throw error;
     }
@@ -432,7 +446,7 @@ Please reply with the 6-digit OTP code.
 const tokenManager = new TokenManager(bot);
 
 bot.command("vacancies", async (ctx) => {
-  console.log('✅ /vacancies command triggered');
+  console.log("✅ /vacancies command triggered");
   try {
     ctx.reply("Fetching available housemanship vacancies...");
     const vacancies = await getVacancies();
@@ -456,7 +470,7 @@ bot.command("vacancies", async (ctx) => {
 });
 
 bot.command("testperformance", async (ctx) => {
-    console.log('✅ /testperformance command triggered');
+  console.log("✅ /testperformance command triggered");
   if (ctx.from.id.toString() !== process.env.TELEGRAM_CHAT_ID) {
     return ctx.reply("⛔ Admin only");
   }
@@ -466,7 +480,7 @@ bot.command("testperformance", async (ctx) => {
 
     const testHospitals = [
       "Federal Medical Centre Asaba",
-      "Lagos University Teaching Hospital"
+      "Lagos University Teaching Hospital",
     ];
 
     // ❌ OLD METHOD: Fetch all users
@@ -477,9 +491,10 @@ bot.command("testperformance", async (ctx) => {
     const time1 = Date.now() - start1;
 
     // Filter in JavaScript
-    const matchedOld = allUsers?.filter(user => 
-      user.hospitals?.some(h => testHospitals.includes(h))
-    ) || [];
+    const matchedOld =
+      allUsers?.filter((user) =>
+        user.hospitals?.some((h) => testHospitals.includes(h)),
+      ) || [];
 
     // ✅ NEW METHOD: Database-filtered query
     const start2 = Date.now();
@@ -505,7 +520,6 @@ bot.command("testperformance", async (ctx) => {
 
 🚀 Performance: ${improvement}% faster!
 💾 Data saved: ${((1 - (filteredUsers?.length || 0) / (allUsers?.length || 1)) * 100).toFixed(1)}% less data transferred`);
-
   } catch (error) {
     ctx.reply(`❌ Test failed: ${error.message}`);
   }
@@ -527,14 +541,14 @@ bot.command("start", async (ctx) => {
   try {
     // Fetch ALL subscriptions for this user
     const { data: subscriptions, error } = await supabase
-      .from("subscriptions")
+      .from("subscription2")
       .select("hospitals, plan, plan_id, phone_number")
       .eq("user_id", userId);
 
     if (error || !subscriptions?.length) {
       console.error("Error fetching subscriptions:", error);
       return ctx.reply(
-        "⚠️ I couldn't find your subscription details. Please subscribe first."
+        "⚠️ I couldn't find your subscription details. Please subscribe first.",
       );
     }
 
@@ -569,7 +583,7 @@ bot.command("start", async (ctx) => {
 // Catch-all message handler (must be AFTER all command handlers)
 // Only log non-command messages to avoid interference
 
-  // Ignore if it's a command (starts with /)
+// Ignore if it's a command (starts with /)
 //   bot.on("message", async (ctx, next) => {
 //   if (!ctx.message?.text?.startsWith('/')) {
 //     console.log("Chat ID:", ctx.chat.id);
@@ -582,99 +596,113 @@ bot.hears(/^[^/].*/, (ctx) => {
   console.log("Non-command message from Chat ID:", ctx.chat.id);
 });
 
-
-
-
 // === Vacancy Fetching Function ===
 async function getVacancies() {
   try {
     let token;
-    let tokenSource = 'unknown';
+    let tokenSource = "unknown";
 
     // Priority 1: Try TokenManager (automatic with OTP)
     if (process.env.USER_EMAIL && process.env.USER_PASSWORD) {
       try {
         token = await tokenManager.getToken();
-        tokenSource = 'TokenManager (Automatic Authentication)';
+        tokenSource = "TokenManager (Automatic Authentication)";
         // console.log('✅ Using token from TokenManager');
       } catch (error) {
-        console.error('⚠️ TokenManager failed:', error.message);
-        console.log('Attempting fallback to manual JWT_TOKEN...');
+        console.error("⚠️ TokenManager failed:", error.message);
+        console.log("Attempting fallback to manual JWT_TOKEN...");
       }
     } else {
-      console.log('⚠️ USER_EMAIL or USER_PASSWORD not configured, skipping TokenManager');
+      console.log(
+        "⚠️ USER_EMAIL or USER_PASSWORD not configured, skipping TokenManager",
+      );
     }
 
     // Priority 2: Fallback to manual JWT_TOKEN
     if (!token && process.env.JWT_TOKEN) {
       token = process.env.JWT_TOKEN;
-      tokenSource = 'Manual JWT_TOKEN (Environment Variable)';
-      console.log('✅ Using manual JWT_TOKEN from environment');
+      tokenSource = "Manual JWT_TOKEN (Environment Variable)";
+      console.log("✅ Using manual JWT_TOKEN from environment");
 
       // Validate expiry
       try {
-        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64'));
+        const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64"));
         const expiresIn = (payload.exp * 1000 - Date.now()) / 1000 / 60;
 
         if (expiresIn < 0) {
-          console.warn(`⚠️ Manual JWT_TOKEN is EXPIRED (expired ${Math.abs(Math.floor(expiresIn))} minutes ago)`);
-          console.warn('Please update JWT_TOKEN in environment variables or configure automatic authentication');
+          console.warn(
+            `⚠️ Manual JWT_TOKEN is EXPIRED (expired ${Math.abs(Math.floor(expiresIn))} minutes ago)`,
+          );
+          console.warn(
+            "Please update JWT_TOKEN in environment variables or configure automatic authentication",
+          );
         } else if (expiresIn < 60) {
-          console.warn(`⚠️ Manual JWT_TOKEN expires soon (${Math.floor(expiresIn)} minutes remaining)`);
+          console.warn(
+            `⚠️ Manual JWT_TOKEN expires soon (${Math.floor(expiresIn)} minutes remaining)`,
+          );
         } else {
-          console.log(`✅ Manual token valid for ${Math.floor(expiresIn)} more minutes`);
+          console.log(
+            `✅ Manual token valid for ${Math.floor(expiresIn)} more minutes`,
+          );
         }
       } catch (parseError) {
-        console.warn('⚠️ Could not parse manual token expiry:', parseError.message);
+        console.warn(
+          "⚠️ Could not parse manual token expiry:",
+          parseError.message,
+        );
       }
     }
 
     // Priority 3: No token available
     if (!token) {
       const errorMessage =
-        'No authentication token available. Please provide either:\n' +
-        '1. USER_EMAIL and USER_PASSWORD (+ BOT_TOKEN and TELEGRAM_CHAT_ID) for automatic authentication, or\n' +
-        '2. JWT_TOKEN for manual authentication';
+        "No authentication token available. Please provide either:\n" +
+        "1. USER_EMAIL and USER_PASSWORD (+ BOT_TOKEN and TELEGRAM_CHAT_ID) for automatic authentication, or\n" +
+        "2. JWT_TOKEN for manual authentication";
 
-      console.error('❌', errorMessage);
+      console.error("❌", errorMessage);
       throw new Error(errorMessage);
     }
 
     // Make API request
     // console.log(`Making API request using ${tokenSource}...`);
     const response = await axios.post(
-      process.env.API_URL || 'https://api.housemanship.mdcn.gov.ng/api/availablevacancies.php',
+      process.env.API_URL ||
+        "https://api.housemanship.mdcn.gov.ng/api/availablevacancies.php",
       { jwt: token, tid: 1 },
       {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     // console.log(`✅ Request successful using ${tokenSource}`);
     // console.log(`✅ Retrieved ${response.data?.length || 0} vacancies`);
     return response.data;
-
   } catch (error) {
-    console.error('❌ Error fetching vacancies:', error.message);
+    console.error("❌ Error fetching vacancies:", error.message);
 
     if (error.response?.status === 401) {
-      console.error('❌ Authentication failed (401 Unauthorized)');
-      console.error('Token is invalid or expired.');
+      console.error("❌ Authentication failed (401 Unauthorized)");
+      console.error("Token is invalid or expired.");
 
       // Clear cached token to force refresh on next call
       tokenManager.token = null;
       tokenManager.expiry = null;
 
-      console.log('💡 Suggestions:');
-      console.log('  1. If using manual JWT_TOKEN, update it in environment variables');
-      console.log('  2. If using automatic auth, check USER_EMAIL and USER_PASSWORD');
-      console.log('  3. Ensure Telegram bot is configured for OTP if needed');
+      console.log("💡 Suggestions:");
+      console.log(
+        "  1. If using manual JWT_TOKEN, update it in environment variables",
+      );
+      console.log(
+        "  2. If using automatic auth, check USER_EMAIL and USER_PASSWORD",
+      );
+      console.log("  3. Ensure Telegram bot is configured for OTP if needed");
     } else if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
 
     return [];
@@ -685,7 +713,7 @@ function startInterval(time) {
   if (checkInterval) clearInterval(checkInterval);
   checkInterval = setInterval(checkForUpdates, time);
   console.log(
-    `🔃 Started checkForUpdates interval: every ${time}s at ${new Date().toLocaleString()}`
+    `🔃 Started checkForUpdates interval: every ${time}s at ${new Date().toLocaleString()}`,
   );
 }
 
@@ -716,10 +744,10 @@ async function checkForUpdates() {
     const newNames = new Set(newVacancies.map((v) => v.centerName));
 
     const addedHospitals = newVacancies.filter(
-      (v) => !prevNames.has(v.centerName)
+      (v) => !prevNames.has(v.centerName),
     );
     const removedHospitals = previousVacancies.filter(
-      (v) => !newNames.has(v.centerName)
+      (v) => !newNames.has(v.centerName),
     );
 
     let message = "";
@@ -787,13 +815,13 @@ async function queuePersonalNotifications(addedHospitals, removedHospitals) {
   if (addedHospitals.length === 0) return;
 
   try {
-    const hospitalNames = addedHospitals.map(h => h.centerName);
-    
+    const hospitalNames = addedHospitals.map((h) => h.centerName);
+
     console.log(`🔍 Searching for users watching: ${hospitalNames.join(", ")}`);
 
     // ✅ Database-level filtering - only fetch matching users
     const { data: users, error } = await supabase
-      .from("subscriptions")
+      .from("subscription2")
       .select("phone_number, hospitals, plan, user_id")
       .overlaps("hospitals", hospitalNames);
 
@@ -811,12 +839,12 @@ async function queuePersonalNotifications(addedHospitals, removedHospitals) {
 
     // Build notification tasks
     const tasks = [];
-    
+
     for (const user of users) {
       if (!user.hospitals || !Array.isArray(user.hospitals)) continue;
 
-      const matchedHospitals = addedHospitals.filter(h =>
-        user.hospitals.includes(h.centerName)
+      const matchedHospitals = addedHospitals.filter((h) =>
+        user.hospitals.includes(h.centerName),
       );
 
       if (matchedHospitals.length > 0) {
@@ -828,14 +856,13 @@ async function queuePersonalNotifications(addedHospitals, removedHospitals) {
           user,
           hospitalList,
           matchedHospitals,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
     }
 
     notificationQueue.push(...tasks);
     console.log(`📬 Queued ${tasks.length} personal notifications`);
-
   } catch (error) {
     console.error("Error queuing notifications:", error);
   }
@@ -851,7 +878,7 @@ async function processNotificationQueue() {
   try {
     while (notificationQueue.length > 0) {
       const batch = notificationQueue.splice(0, BATCH_SIZE);
-      
+
       console.log(`📤 Processing batch of ${batch.length} notifications...`);
 
       await Promise.allSettled(
@@ -868,25 +895,29 @@ async function processNotificationQueue() {
             } else if (user.plan === "bonus") {
               const promises = [];
               if (user.phone_number) {
-                promises.push(sendWhatsAppMessage(user.phone_number, hospitalList));
+                promises.push(
+                  sendWhatsAppMessage(user.phone_number, hospitalList),
+                );
               }
               if (user.user_id) {
-                promises.push(sendTelegramMessage(user.user_id, personalMessage, bot));
+                promises.push(
+                  sendTelegramMessage(user.user_id, personalMessage, bot),
+                );
               }
               await Promise.allSettled(promises);
             }
           } catch (err) {
             console.error(
               `❌ Failed to notify ${user.user_id || user.phone_number}:`,
-              err.message
+              err.message,
             );
           }
-        })
+        }),
       );
 
       // Rate limiting between batches
       if (notificationQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
@@ -913,13 +944,13 @@ async function sendWhatsAppMessage(phone, message) {
         data: {
           hospitallist: message,
         }, // e.g., { hospitallist: "Citizen Medical Center" }
-      }
+      },
     );
     console.log("✅ WhatsApp template message sent:", response.data);
   } catch (err) {
     console.error(
       "❌ Failed to send WhatsApp template message:",
-      err.response?.data || err.message
+      err.response?.data || err.message,
     );
   }
 }
@@ -931,7 +962,7 @@ async function sendTelegramMessage(userId, message, bot) {
   } catch (err) {
     console.error(
       `❌ Failed to send Telegram message to ${userId}:`,
-      err.response?.description || err.message
+      err.response?.description || err.message,
     );
   }
 }
@@ -944,7 +975,7 @@ async function notifyIfNoUpdateIn24Hrs() {
     await bot.telegram.sendMessage(
       process.env.CHAT_ID,
       "Relax, *No New slot* has been added in the portal *within the last 24hrs*; so keep enjoying your day!",
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
 
     if (intervalTime !== 47000) {
@@ -965,7 +996,7 @@ async function notifyIfNoUpdateIn24Hrs() {
       try {
         await bot.telegram.sendMessage(
           process.env.CHAT_ID,
-          "✅ Debug: Bot is alive!"
+          "✅ Debug: Bot is alive!",
         );
         res.send("✅ Message sent to Telegram");
       } catch (err) {
@@ -987,7 +1018,6 @@ async function notifyIfNoUpdateIn24Hrs() {
 
     //app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
     app.use(bot.webhookCallback(WEBHOOK_PATH));
-    
 
     // Root route for Railway
     app.get("/", (req, res) => {
@@ -1020,14 +1050,17 @@ async function notifyIfNoUpdateIn24Hrs() {
     // ✅ MONITOR QUEUE HEALTH
     setInterval(() => {
       if (notificationQueue.length > 0) {
-        console.log(`📊 Queue status: ${notificationQueue.length} pending notifications`);
+        console.log(
+          `📊 Queue status: ${notificationQueue.length} pending notifications`,
+        );
       }
       if (notificationQueue.length > 500) {
-        console.warn(`⚠️ Large queue backlog: ${notificationQueue.length} notifications!`);
+        console.warn(
+          `⚠️ Large queue backlog: ${notificationQueue.length} notifications!`,
+        );
       }
     }, 30000); // Check every 30 seconds
   } catch (err) {
     console.error("Failed to launch bot:", err);
   }
 })();
-
