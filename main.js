@@ -52,6 +52,11 @@ class TokenManager {
     this.otpUrl = "https://api.housemanship.mdcn.gov.ng/api/verify_otp.php";
     this.bot = bot;
     this.otpPromiseResolve = null;
+    this.isRefreshing = false;     // Mutex flag to prevent concurrent refreshes
+    this.refreshPromise = null;    // Shared promise so concurrent callers await the same refresh
+    this.otpFailCount = 0;         // Tracks consecutive OTP failures
+    this.otpLocked = false;        // When true, automatic retries are blocked
+    this.MAX_OTP_RETRIES = 2;      // Max OTP attempts before locking
 
     if (this.bot) {
       this.setupTelegramListeners();
@@ -245,9 +250,28 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
   }
 
   async forceRefreshToken(ctx) {
+    // If a refresh is already in-flight, wait for it instead of starting another
+    if (this.isRefreshing) {
+      await ctx.reply("⏳ A token refresh is already in progress. Waiting for it to complete...");
+      try {
+        await this.refreshPromise;
+        await ctx.reply("✅ In-flight refresh completed. Token is now valid.");
+        return;
+      } catch (error) {
+        await ctx.replyWithMarkdown(
+          `❌ *In-flight refresh failed*\n\nError: ${error.message}`,
+        );
+        return;
+      }
+    }
+
     await ctx.reply("🔄 Forcing token refresh...");
 
     try {
+      // Reset OTP lock — manual /refresh always gets a fresh attempt
+      this.otpFailCount = 0;
+      this.otpLocked = false;
+
       // Clear existing token
       this.token = null;
       this.expiry = null;
@@ -274,6 +298,19 @@ When OTP is required, I'll send you a message. Simply reply with the 6-digit cod
   async getToken() {
     // Check if current token is still valid (with 1 hour buffer)
     if (this.token && this.expiry - Date.now() > 3600000) {
+      return this.token;
+    }
+
+    // If OTP is locked, don't attempt automatic refresh — require manual /refresh
+    if (this.otpLocked) {
+      console.log("🔒 OTP locked after repeated failures. Use /refresh to retry.");
+      throw new Error("Authentication locked after repeated OTP failures. Send /refresh to retry.");
+    }
+
+    // If a refresh is already in-flight, piggyback on it instead of starting another
+    if (this.isRefreshing) {
+      console.log("⏳ Refresh already in progress, waiting for it...");
+      await this.refreshPromise;
       return this.token;
     }
 
@@ -341,6 +378,25 @@ Please reply with the 6-digit OTP code.
   }
 
   async refreshToken() {
+    // MUTEX: If already refreshing, return the existing promise
+    if (this.isRefreshing) {
+      console.log("⏳ refreshToken() skipped — already in progress");
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this._doRefresh();
+
+    try {
+      await this.refreshPromise;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  // Internal method that does the actual refresh work (called only once at a time)
+  async _doRefresh() {
     try {
       // Step 1: Initial login request
       console.log("Sending login request...");
@@ -376,6 +432,24 @@ Please reply with the 6-digit OTP code.
               "Telegram OTP request failed:",
               telegramError.message,
             );
+
+            // Track OTP failure and lock if max retries reached
+            this.otpFailCount++;
+            console.log(`⚠️ OTP failure #${this.otpFailCount} of ${this.MAX_OTP_RETRIES}`);
+
+            if (this.otpFailCount >= this.MAX_OTP_RETRIES) {
+              this.otpLocked = true;
+              console.log("🔒 OTP locked — automatic retries disabled");
+
+              if (this.bot && TELEGRAM_CHAT_ID) {
+                await this.bot.telegram.sendMessage(
+                  TELEGRAM_CHAT_ID,
+                  "🔒 *Authentication locked* after " + this.MAX_OTP_RETRIES + " failed OTP attempts.\n\nAutomatic retries are *disabled*.\nSend /refresh to try again manually.",
+                  { parse_mode: "Markdown" },
+                );
+              }
+            }
+
             throw new Error(
               "Could not get OTP: automatic extraction failed and Telegram request timed out",
             );
