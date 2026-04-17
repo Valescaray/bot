@@ -73,17 +73,17 @@ class TokenManager {
       await this.sendTokenStatus(ctx);
     });
 
-    // Command: /test
-    this.bot.command("test", async (ctx) => {
-      if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
-      await this.runTest(ctx);
-    });
+    // Command: /test — COMMENTED OUT (uses TokenManager/OTP)
+    // this.bot.command("test", async (ctx) => {
+    //   if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+    //   await this.runTest(ctx);
+    // });
 
-    // Command: /refresh
-    this.bot.command("refresh", async (ctx) => {
-      if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
-      await this.forceRefreshToken(ctx);
-    });
+    // Command: /refresh — COMMENTED OUT (uses TokenManager/OTP)
+    // this.bot.command("refresh", async (ctx) => {
+    //   if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+    //   await this.forceRefreshToken(ctx);
+    // });
 
     // Command: /help
     this.bot.command("help", async (ctx) => {
@@ -91,16 +91,16 @@ class TokenManager {
       await this.sendHelpMessage(ctx);
     });
 
-    this.bot.hears(/^\d{6}$/, async (ctx) => {
-      if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
-
-      if (this.otpPromiseResolve) {
-        console.log("✅ OTP received from Telegram:", ctx.message.text);
-        await ctx.reply("✅ OTP received! Verifying...");
-        this.otpPromiseResolve(ctx.message.text);
-        this.otpPromiseResolve = null;
-      }
-    });
+    // OTP listener — COMMENTED OUT (uses TokenManager/OTP)
+    // this.bot.hears(/^\d{6}$/, async (ctx) => {
+    //   if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
+    //   if (this.otpPromiseResolve) {
+    //     console.log("✅ OTP received from Telegram:", ctx.message.text);
+    //     await ctx.reply("✅ OTP received! Verifying...");
+    //     this.otpPromiseResolve(ctx.message.text);
+    //     this.otpPromiseResolve = null;
+    //   }
+    // });
 
     // Listen for OTP (6-digit numbers)
     // this.bot.on('text', async (ctx) => {
@@ -759,20 +759,11 @@ async function getVacancies() {
 
     if (error.response?.status === 401) {
       console.error("❌ Authentication failed (401 Unauthorized)");
-      console.error("Token is invalid or expired.");
+      console.error("Token is invalid or expired. Please update JWT_TOKEN in environment variables.");
 
-      // Clear cached token to force refresh on next call
-      tokenManager.token = null;
-      tokenManager.expiry = null;
-
-      console.log("💡 Suggestions:");
-      console.log(
-        "  1. If using manual JWT_TOKEN, update it in environment variables",
-      );
-      console.log(
-        "  2. If using automatic auth, check USER_EMAIL and USER_PASSWORD",
-      );
-      console.log("  3. Ensure Telegram bot is configured for OTP if needed");
+      // TokenManager clearing disabled — only using JWT_TOKEN for now
+      // tokenManager.token = null;
+      // tokenManager.expiry = null;
     } else if (error.response) {
       console.error("Response status:", error.response.status);
       console.error("Response data:", error.response.data);
