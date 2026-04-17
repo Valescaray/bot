@@ -64,8 +64,11 @@ class TokenManager {
   }
 
   setupTelegramListeners() {
+    console.log("🔧 TELEGRAM_CHAT_ID configured as:", TELEGRAM_CHAT_ID || "❌ NOT SET");
+
     // Command: /status
     this.bot.command("status", async (ctx) => {
+      console.log(`📩 /status from chat ${ctx.chat.id} (expected: ${TELEGRAM_CHAT_ID})`);
       if (ctx.chat.id.toString() !== TELEGRAM_CHAT_ID) return;
       await this.sendTokenStatus(ctx);
     });
