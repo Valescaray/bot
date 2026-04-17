@@ -370,7 +370,9 @@ Please reply with the 6-digit OTP code.
           this.bot.telegram.sendMessage(
             TELEGRAM_CHAT_ID,
             "⏱️ OTP request timed out. Please try again.",
-          );
+          ).catch((err) => {
+            console.error("Failed to send timeout message:", err.message);
+          });
           reject(new Error("OTP request timed out"));
         }
       }, timeoutMs);
