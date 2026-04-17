@@ -711,19 +711,20 @@ async function getVacancies() {
       }
     }
 
-    // Priority 2: Try TokenManager (automatic with OTP) — only if JWT_TOKEN wasn't usable
-    if (!token && process.env.USER_EMAIL && process.env.USER_PASSWORD) {
-      try {
-        token = await tokenManager.getToken();
-        tokenSource = "TokenManager (Automatic Authentication)";
-      } catch (error) {
-        console.error("⚠️ TokenManager failed:", error.message);
-      }
-    } else if (!token) {
-      console.log(
-        "⚠️ No valid JWT_TOKEN and USER_EMAIL/USER_PASSWORD not configured",
-      );
-    }
+    // Priority 2: Try TokenManager (automatic with OTP) — COMMENTED OUT FOR NOW
+    // Uncomment when ready to work on OTP workflow
+    // if (!token && process.env.USER_EMAIL && process.env.USER_PASSWORD) {
+    //   try {
+    //     token = await tokenManager.getToken();
+    //     tokenSource = "TokenManager (Automatic Authentication)";
+    //   } catch (error) {
+    //     console.error("⚠️ TokenManager failed:", error.message);
+    //   }
+    // } else if (!token) {
+    //   console.log(
+    //     "⚠️ No valid JWT_TOKEN and USER_EMAIL/USER_PASSWORD not configured",
+    //   );
+    // }
 
     // Priority 3: No token available
     if (!token) {
