@@ -681,55 +681,48 @@ async function getVacancies() {
     let token;
     let tokenSource = "unknown";
 
-    // Priority 1: Try TokenManager (automatic with OTP)
-    if (process.env.USER_EMAIL && process.env.USER_PASSWORD) {
+    // Priority 1: Use manual JWT_TOKEN if set and still valid
+    if (process.env.JWT_TOKEN) {
       try {
-        token = await tokenManager.getToken();
-        tokenSource = "TokenManager (Automatic Authentication)";
-        // console.log('✅ Using token from TokenManager');
-      } catch (error) {
-        console.error("⚠️ TokenManager failed:", error.message);
-        console.log("Attempting fallback to manual JWT_TOKEN...");
-      }
-    } else {
-      console.log(
-        "⚠️ USER_EMAIL or USER_PASSWORD not configured, skipping TokenManager",
-      );
-    }
-
-    // Priority 2: Fallback to manual JWT_TOKEN
-    if (!token && process.env.JWT_TOKEN) {
-      token = process.env.JWT_TOKEN;
-      tokenSource = "Manual JWT_TOKEN (Environment Variable)";
-      console.log("✅ Using manual JWT_TOKEN from environment");
-
-      // Validate expiry
-      try {
-        const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64"));
+        const payload = JSON.parse(Buffer.from(process.env.JWT_TOKEN.split(".")[1], "base64"));
         const expiresIn = (payload.exp * 1000 - Date.now()) / 1000 / 60;
 
-        if (expiresIn < 0) {
+        if (expiresIn > 5) {
+          // Token still has more than 5 minutes left — use it
+          token = process.env.JWT_TOKEN;
+          tokenSource = "Manual JWT_TOKEN (Environment Variable)";
+
+          if (expiresIn < 60) {
+            console.warn(
+              `⚠️ Manual JWT_TOKEN expires soon (${Math.floor(expiresIn)} minutes remaining)`,
+            );
+          }
+        } else if (expiresIn > 0) {
           console.warn(
-            `⚠️ Manual JWT_TOKEN is EXPIRED (expired ${Math.abs(Math.floor(expiresIn))} minutes ago)`,
-          );
-          console.warn(
-            "Please update JWT_TOKEN in environment variables or configure automatic authentication",
-          );
-        } else if (expiresIn < 60) {
-          console.warn(
-            `⚠️ Manual JWT_TOKEN expires soon (${Math.floor(expiresIn)} minutes remaining)`,
+            `⚠️ Manual JWT_TOKEN almost expired (${Math.floor(expiresIn)} minutes), falling back to auto-auth`,
           );
         } else {
-          console.log(
-            `✅ Manual token valid for ${Math.floor(expiresIn)} more minutes`,
+          console.warn(
+            `⚠️ Manual JWT_TOKEN is EXPIRED (expired ${Math.abs(Math.floor(expiresIn))} minutes ago), falling back to auto-auth`,
           );
         }
       } catch (parseError) {
-        console.warn(
-          "⚠️ Could not parse manual token expiry:",
-          parseError.message,
-        );
+        console.warn("⚠️ Could not parse manual JWT_TOKEN:", parseError.message);
       }
+    }
+
+    // Priority 2: Try TokenManager (automatic with OTP) — only if JWT_TOKEN wasn't usable
+    if (!token && process.env.USER_EMAIL && process.env.USER_PASSWORD) {
+      try {
+        token = await tokenManager.getToken();
+        tokenSource = "TokenManager (Automatic Authentication)";
+      } catch (error) {
+        console.error("⚠️ TokenManager failed:", error.message);
+      }
+    } else if (!token) {
+      console.log(
+        "⚠️ No valid JWT_TOKEN and USER_EMAIL/USER_PASSWORD not configured",
+      );
     }
 
     // Priority 3: No token available
