@@ -885,7 +885,7 @@ async function queuePersonalNotifications(addedHospitals, removedHospitals) {
 
     // ✅ Database-level filtering - only fetch matching users
     const { data: users, error } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("phone_number, hospitals, plan, user_id")
       .overlaps("hospitals", hospitalNames);
 
