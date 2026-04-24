@@ -620,7 +620,7 @@ bot.command("start", async (ctx) => {
   try {
     // Fetch ALL subscriptions for this user
     const { data: subscriptions, error } = await supabase
-      .from("subscription2")
+      .from("subscriptions")
       .select("hospitals, plan, plan_id, phone_number")
       .eq("user_id", userId);
 
